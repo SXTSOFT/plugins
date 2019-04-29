@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +36,9 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
   String videoPath;
   VideoPlayerController videoController;
   VoidCallback videoPlayerListener;
+
+  double _scale = 1.0;
+  double _previousScale;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -94,10 +98,22 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
         ),
       );
     } else {
-      return AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
-      );
+      return GestureDetector(
+          onScaleStart: (ScaleStartDetails details) {
+            _previousScale = _scale;
+          },
+          onScaleUpdate: (ScaleUpdateDetails details) {
+            _scale = max(_previousScale * details.scale, 1);
+
+            controller.setZoom(_scale);
+          },
+          onScaleEnd: (ScaleEndDetails details) {
+            _previousScale = null;
+          },
+          child: AspectRatio(
+            aspectRatio: controller.value.aspectRatio,
+            child: CameraPreview(controller),
+          ));
     }
   }
 
