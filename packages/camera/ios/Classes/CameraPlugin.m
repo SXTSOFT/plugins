@@ -83,6 +83,7 @@
 @property(strong, nonatomic) AVCaptureAudioDataOutput *audioOutput;
 @property(assign, nonatomic) BOOL isRecording;
 @property(assign, nonatomic) BOOL isAudioSetup;
+@property(nonatomic, assign) float zoom;
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                              error:(NSError **)error;
@@ -90,6 +91,7 @@
 - (void)stop;
 - (void)startVideoRecordingAtPath:(NSString *)path result:(FlutterResult)result;
 - (void)stopVideoRecordingWithResult:(FlutterResult)result;
+- (void)setZoom:(float)zoom;
 - (void)captureToFile:(NSString *)filename result:(FlutterResult)result;
 @end
 
@@ -151,6 +153,17 @@
 
 - (void)stop {
   [_captureSession stopRunning];
+}
+
+- (void)setZoom:(float)zoom {
+    if (zoom < 1) {
+        zoom = 1;
+        return;
+    }
+
+    [_captureDevice lockForConfiguration:NULL];
+    [_captureDevice setVideoZoomFactor:zoom];
+    [_captureDevice unlockForConfiguration];
 }
 
 - (void)captureToFile:(NSString *)path result:(FlutterResult)result {
@@ -428,6 +441,10 @@
   return self;
 }
 
+- (void)extracted:(FlutterMethodCall * _Nonnull)call result:(FlutterResult _Nonnull)result {
+    [_camera captureToFile:call.arguments[@"path"] result:result];
+}
+
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
   if ([@"init" isEqualToString:call.method]) {
     if (_camera) {
@@ -495,12 +512,16 @@
       });
       [cam start];
     }
+  } else if ([@"setZoom" isEqualToString:call.method]) {
+      float zoom = [call.arguments[@"zoom"] floatValue];
+      [_camera setZoom:zoom];
+      result(nil);
   } else {
     NSDictionary *argsMap = call.arguments;
     NSUInteger textureId = ((NSNumber *)argsMap[@"textureId"]).unsignedIntegerValue;
 
     if ([@"takePicture" isEqualToString:call.method]) {
-      [_camera captureToFile:call.arguments[@"path"] result:result];
+        [self extracted:call result:result];
     } else if ([@"dispose" isEqualToString:call.method]) {
       [_registry unregisterTexture:textureId];
       [_camera close];
