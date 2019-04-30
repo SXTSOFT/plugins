@@ -329,8 +329,8 @@ public class CameraPlugin implements MethodCallHandler {
         isFrontFacing =
             characteristics.get(CameraCharacteristics.LENS_FACING)
                 == CameraMetadata.LENS_FACING_FRONT;
-        // computeBestCaptureSize(streamConfigurationMap);
-        computeBestPreviewAndRecordingSize(streamConfigurationMap, minPreviewSize);
+        computeBestCaptureSize(streamConfigurationMap);
+        computeBestPreviewAndRecordingSize(streamConfigurationMap, minPreviewSize, captureSize);
 
         if (cameraPermissionContinuation != null) {
           result.error("cameraPermission", "Camera permission request ongoing", null);
@@ -403,36 +403,17 @@ public class CameraPlugin implements MethodCallHandler {
     }
 
     private void computeBestPreviewAndRecordingSize(
-        StreamConfigurationMap streamConfigurationMap, Size minPreviewSize) {
-      
+        StreamConfigurationMap streamConfigurationMap, Size minPreviewSize, Size captureSize) {
+      Size[] sizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
+
       // Preview size and video size should not be greater than screen resolution or 1080.
       Point screenResolution = new Point();
       Display display = activity.getWindowManager().getDefaultDisplay();
       display.getRealSize(screenResolution);
-      final boolean swapWH = screenResolution.x > screenResolution.y; //getMediaOrientation() % 180 == 90;
-      int screenWidth = swapWH ? screenResolution.x : screenResolution.y;
-      int screenHeight = swapWH ? screenResolution.y : screenResolution.x;
 
-//      Log.i("CameraPlugin", "screen h:"+screenHeight+",w:"+screenWidth);
-      // 屏幕的对比度
-      float screenSizeRatio = (float) screenWidth / screenHeight;
-//      Log.i("CameraPlugin", "screenSizeRatio:"+screenSizeRatio);
-
-      List<Size> captureList = Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG));
-      List<Size> captureGoodList = new ArrayList<>();
-      for (int i = 0; i < captureList.size(); i++) {
-        Size size = captureList.get(i);
-//        Log.i("CameraPlugin", "capture h:"+size.getHeight()+",w:"+size.getWidth());
-        if ((float)size.getWidth()/size.getHeight() == screenSizeRatio) {
-          captureGoodList.add(size);
-        }
-      }
-
-      captureSize = Collections.max(captureGoodList, new CompareSizesByArea());
-
-
-      Size[] sizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
-
+      final boolean swapWH = getMediaOrientation() % 180 == 90;
+      int screenWidth = swapWH ? screenResolution.y : screenResolution.x;
+      int screenHeight = swapWH ? screenResolution.x : screenResolution.y;
 
       List<Size> goodEnough = new ArrayList<>();
       for (Size s : sizes) {
@@ -451,11 +432,11 @@ public class CameraPlugin implements MethodCallHandler {
         previewSize = sizes[0];
         videoSize = sizes[0];
       } else {
-        //float captureSizeRatio = (float) captureSize.getWidth() / captureSize.getHeight();
+        float captureSizeRatio = (float) captureSize.getWidth() / captureSize.getHeight();
 
         previewSize = goodEnough.get(0);
         for (Size s : goodEnough) {
-          if ((float) s.getWidth() / s.getHeight() == screenSizeRatio) {
+          if ((float) s.getWidth() / s.getHeight() == captureSizeRatio) {
             previewSize = s;
             break;
           }
@@ -464,7 +445,7 @@ public class CameraPlugin implements MethodCallHandler {
         Collections.reverse(goodEnough);
         videoSize = goodEnough.get(0);
         for (Size s : goodEnough) {
-          if ((float) s.getWidth() / s.getHeight() == screenSizeRatio) {
+          if ((float) s.getWidth() / s.getHeight() == captureSizeRatio) {
             videoSize = s;
             break;
           }
