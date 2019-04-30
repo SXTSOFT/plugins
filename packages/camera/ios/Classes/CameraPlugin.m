@@ -92,6 +92,8 @@
 - (void)startVideoRecordingAtPath:(NSString *)path result:(FlutterResult)result;
 - (void)stopVideoRecordingWithResult:(FlutterResult)result;
 - (void)setZoom:(float)zoom;
+- (void)focus:(int)x y:(int)y;
+- (void)setFlashMode:(NSString *) mode;
 - (void)captureToFile:(NSString *)filename result:(FlutterResult)result;
 @end
 
@@ -160,10 +162,46 @@
         zoom = 1;
         return;
     }
-
+    zoom = MAX(1.0, MIN(zoom, _captureDevice.activeFormat.videoMaxZoomFactor));
     [_captureDevice lockForConfiguration:NULL];
     [_captureDevice setVideoZoomFactor:zoom];
     [_captureDevice unlockForConfiguration];
+}
+
+- (void)focus:(int)x y:(int)y {
+    CGRect screenRect = [[UIScreen mainScreen] bounds];
+    CGFloat screenWidth = screenRect.size.width;
+    CGFloat screenHeight = screenRect.size.height;
+    CGFloat focus_x = x/screenWidth;
+    CGFloat focus_y = y/screenHeight;
+    [_captureDevice lockForConfiguration:nil];
+    
+//    if([_captureDevice isFlashModeSupported:AVCaptureFocusModeAutoFocus]){
+//        [_captureDevice setFocusPointOfInterest:CGPointMake(focus_x, focus_y)];
+//        [_captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
+//    }
+    if([_captureDevice isExposureModeSupported:AVCaptureExposureModeAutoExpose]){
+        [_captureDevice setExposurePointOfInterest:CGPointMake(focus_x, focus_y)];
+        [_captureDevice setExposureMode:AVCaptureExposureModeAutoExpose];
+    }
+    [_captureDevice unlockForConfiguration];
+}
+
+- (void)setFlashMode:(NSString *)mode {
+    NSError *error = nil;
+    if([_captureDevice hasFlash]){
+        if([_captureDevice lockForConfiguration:&error]){
+           // _captureDevice.torchMode = 0;
+        }
+        if([mode isEqual:@"off"]){
+            [_captureDevice setFlashMode:AVCaptureFlashModeOff];
+        } else if([mode isEqual:@"on"]){
+            [_captureDevice setFlashMode:AVCaptureFlashModeOn];
+        } else if([mode isEqual:@"auto"]){
+            [_captureDevice setFlashMode:AVCaptureFlashModeAuto];
+        }
+        [_captureDevice unlockForConfiguration];
+    }
 }
 
 - (void)captureToFile:(NSString *)path result:(FlutterResult)result {
@@ -441,9 +479,6 @@
   return self;
 }
 
-- (void)extracted:(FlutterMethodCall * _Nonnull)call result:(FlutterResult _Nonnull)result {
-    [_camera captureToFile:call.arguments[@"path"] result:result];
-}
 
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
   if ([@"init" isEqualToString:call.method]) {
@@ -510,18 +545,28 @@
         @"captureWidth" : @(cam.captureSize.width),
         @"captureHeight" : @(cam.captureSize.height),
       });
+      
       [cam start];
     }
   } else if ([@"setZoom" isEqualToString:call.method]) {
       float zoom = [call.arguments[@"zoom"] floatValue];
       [_camera setZoom:zoom];
       result(nil);
+  } else if ([@"focus" isEqualToString:call.method]) {
+      int x = [call.arguments[@"x"] intValue];
+      int y = [call.arguments[@"y"] intValue];
+      [_camera focus:x y:y];
+      result(nil);
+  } else if ([@"setFlashMode" isEqualToString:call.method]) {
+      NSString *modeStr = call.arguments[@"mode"];
+      [_camera setFlashMode:modeStr];
+      result(nil);
   } else {
     NSDictionary *argsMap = call.arguments;
     NSUInteger textureId = ((NSNumber *)argsMap[@"textureId"]).unsignedIntegerValue;
 
     if ([@"takePicture" isEqualToString:call.method]) {
-        [self extracted:call result:result];
+      [_camera captureToFile:call.arguments[@"path"] result:result];
     } else if ([@"dispose" isEqualToString:call.method]) {
       [_registry unregisterTexture:textureId];
       [_camera close];

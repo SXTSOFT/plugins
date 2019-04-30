@@ -110,6 +110,11 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
           onScaleEnd: (ScaleEndDetails details) {
             _previousScale = null;
           },
+          onTapDown: (TapDownDetails details) {
+            controller.focus(
+                details.globalPosition.dx, details.globalPosition.dy);
+          },
+          onForcePressEnd: (ForcePressDetails details) {},
           child: AspectRatio(
             aspectRatio: controller.value.aspectRatio,
             child: CameraPreview(controller),

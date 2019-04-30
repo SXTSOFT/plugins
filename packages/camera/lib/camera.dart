@@ -104,13 +104,13 @@ class CameraPreview extends StatelessWidget {
 
 /// The state of a [CameraController].
 class CameraValue {
-  const CameraValue({
-    this.isInitialized,
-    this.errorDescription,
-    this.previewSize,
-    this.isRecordingVideo,
-    this.isTakingPicture,
-  });
+  const CameraValue(
+      {this.isInitialized,
+      this.errorDescription,
+      this.previewSize,
+      this.isRecordingVideo,
+      this.isTakingPicture,
+      this.flashMode});
 
   const CameraValue.uninitialized()
       : this(
@@ -126,6 +126,8 @@ class CameraValue {
 
   /// True when the camera is recording (not the same as previewing).
   final bool isRecordingVideo;
+
+  final int flashMode;
 
   final String errorDescription;
 
@@ -147,14 +149,15 @@ class CameraValue {
     bool isTakingPicture,
     String errorDescription,
     Size previewSize,
+    int flashMode,
   }) {
     return CameraValue(
-      isInitialized: isInitialized ?? this.isInitialized,
-      errorDescription: errorDescription,
-      previewSize: previewSize ?? this.previewSize,
-      isRecordingVideo: isRecordingVideo ?? this.isRecordingVideo,
-      isTakingPicture: isTakingPicture ?? this.isTakingPicture,
-    );
+        isInitialized: isInitialized ?? this.isInitialized,
+        errorDescription: errorDescription,
+        previewSize: previewSize ?? this.previewSize,
+        isRecordingVideo: isRecordingVideo ?? this.isRecordingVideo,
+        isTakingPicture: isTakingPicture ?? this.isTakingPicture,
+        flashMode: flashMode ?? this.flashMode);
   }
 
   @override
@@ -340,6 +343,28 @@ class CameraController extends ValueNotifier<CameraValue> {
       'setZoom',
       <String, dynamic>{'zoom': zoom},
     );
+  }
+
+  Future<void> focus(double x, double y) async {
+    await _channel.invokeMethod<void>(
+      'focus',
+      <String, dynamic>{'x': x, 'y': y},
+    );
+  }
+
+  Future<void> setFlashMode(String mode) async {
+    await _channel.invokeMethod<void>(
+      'setFlashMode',
+      <String, dynamic>{'mode': mode},
+    );
+  }
+
+  Future<void> getFlashMode() async {
+    final Map<dynamic, dynamic> result = await _channel.invokeMethod(
+      'getFlashMode',
+      <String, dynamic>{'mode': 0},
+    );
+    value = value.copyWith(flashMode: result["flashMode"].toInt());
   }
 
   /// Releases the resources of this camera.

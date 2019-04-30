@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -19,6 +20,7 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
@@ -238,6 +240,17 @@ public class CameraPlugin implements MethodCallHandler {
           }
           break;
         }
+      case "focus": {
+        int x = (int)call.argument("x");
+        int y = (int)call.argument("y");
+        camera.focus(x, y);
+        result.success(null);
+        break;
+      }
+      case "setFlashMode":{
+
+        break;
+      }
       default:
         result.notImplemented();
         break;
@@ -588,7 +601,7 @@ public class CameraPlugin implements MethodCallHandler {
             cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
         captureBuilder.addTarget(imageReader.getSurface());
         captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getMediaOrientation());
-        setScalerCropRegion(captureBuilder, zoom);
+        setScalerCropRegion(captureBuilder);
         cameraCaptureSession.capture(
             captureBuilder.build(),
             new CameraCaptureSession.CaptureCallback() {
@@ -662,7 +675,7 @@ public class CameraPlugin implements MethodCallHandler {
                   Camera.this.cameraCaptureSession = cameraCaptureSession;
                   captureRequestBuilder.set(
                       CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-                  setScalerCropRegion(captureRequestBuilder, zoom);
+                  setScalerCropRegion(captureRequestBuilder);
                   cameraCaptureSession.setRepeatingRequest(
                       captureRequestBuilder.build(), null, null);
                   mediaRecorder.start();
@@ -729,7 +742,7 @@ public class CameraPlugin implements MethodCallHandler {
                 cameraCaptureSession = session;
                 captureRequestBuilder.set(
                     CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-                setScalerCropRegion(captureRequestBuilder, zoom);
+                setScalerCropRegion(captureRequestBuilder);
                 cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
               } catch (CameraAccessException e) {
                 sendErrorEvent(e.getMessage());
@@ -790,13 +803,6 @@ public class CameraPlugin implements MethodCallHandler {
     }
 
     private void setZoom(float step) throws CameraAccessException {
-      calculateZoom(step);
-      setScalerCropRegion(captureRequestBuilder, zoom);
-      cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
-    }
-
-    private void calculateZoom(float step) {
-
       Rect rect = cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
 
       float ratio = (float) 1 / step;
@@ -804,10 +810,66 @@ public class CameraPlugin implements MethodCallHandler {
       int croppedHeight = rect.height() - Math.round((float) rect.height() * ratio);
       zoom = new Rect(croppedWidth / 2, croppedHeight / 2,
               rect.width() - croppedWidth / 2, rect.height() - croppedHeight / 2);
+
+
+      setScalerCropRegion(captureRequestBuilder);
+      cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
     }
 
-    private void setScalerCropRegion(CaptureRequest.Builder captureRequestBuilder, Rect zoom) {
+
+
+    private void focus(int x, int y){
+      MeteringRectangle[] rectangle = calculateFocusRect(x, y);
+      // 对焦模式必须设置为AUTO
+      captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_AUTO);
+      //AE
+      captureRequestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS,rectangle);
+      //AF 此处AF和AE用的同一个rect, 实际AE矩形面积比AF稍大, 这样测光效果更好
+      captureRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS,rectangle);
+      try {
+        // AE/AF区域设置通过setRepeatingRequest不断发请求
+        cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+      } catch (CameraAccessException e) {
+        e.printStackTrace();
+      }
+      //触发对焦
+      captureRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,CaptureRequest.CONTROL_AF_TRIGGER_START);
+      try {
+        //触发对焦通过capture发送请求, 因为用户点击屏幕后只需触发一次对焦
+        cameraCaptureSession.capture(captureRequestBuilder.build(), null, null);
+      } catch (CameraAccessException e) {
+        e.printStackTrace();
+      }
+    }
+    private MeteringRectangle[] calculateFocusRect(int x, int y) {
+      //Size of the Rectangle.
+      int areaSize = 200;
+
+      int left = clamp((int) x - areaSize / 2, 0, previewSize.getWidth() - areaSize);
+      int top = clamp((int) y - areaSize / 2, 0, previewSize.getHeight() - areaSize);
+
+      RectF rectF = new RectF(left, top, left + areaSize, top + areaSize);
+      Rect focusRect = new Rect(Math.round(rectF.left), Math.round(rectF.top), Math.round(rectF.right), Math.round(rectF.bottom));
+      MeteringRectangle meteringRectangle = new MeteringRectangle(focusRect, 1);
+
+      return new MeteringRectangle[] {meteringRectangle};
+    }
+
+    //Clamp the inputs.
+    private int clamp(int x, int min, int max) {
+      if (x > max) {
+        return max;
+      }
+      if (x < min) {
+        return min;
+      }
+      return x;
+    }
+
+
+    private void setScalerCropRegion(CaptureRequest.Builder captureRequestBuilder) {
       captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoom);
+
     }
 
   }
