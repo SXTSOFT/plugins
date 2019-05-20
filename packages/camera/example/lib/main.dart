@@ -38,10 +38,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   VideoPlayerController videoController;
   VoidCallback videoPlayerListener;
 
-<<<<<<< HEAD
   double _scale = 1.0;
   double _previousScale;
-=======
   @override
   void initState() {
     super.initState();
@@ -64,7 +62,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       }
     }
   }
->>>>>>> master
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 

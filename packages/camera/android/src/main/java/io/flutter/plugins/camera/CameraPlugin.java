@@ -699,9 +699,10 @@ public class CameraPlugin implements MethodCallHandler {
 
       try {
         recordingVideo = false;
+        startPreview();
         mediaRecorder.stop();
         mediaRecorder.reset();
-        startPreview();
+        
         result.success(null);
       } catch (CameraAccessException | IllegalStateException e) {
         result.error("videoRecordingFailed", e.getMessage(), null);
