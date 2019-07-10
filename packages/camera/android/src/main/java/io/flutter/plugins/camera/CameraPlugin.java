@@ -86,11 +86,13 @@ public class CameraPlugin implements MethodCallHandler {
   }
 
   public static void registerWith(Registrar registrar) {
-    if (registrar.activity() == null) {
+    if (registrar.activity() == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
       // When a background flutter view tries to register the plugin, the registrar has no activity.
-      // We stop the registration process as this plugin is foreground only.
+      // We stop the registration process as this plugin is foreground only. Also, if the sdk is
+      // less than 21 (min sdk for Camera2) we don't register the plugin.
       return;
     }
+
     final MethodChannel channel =
         new MethodChannel(registrar.messenger(), "plugins.flutter.io/camera");
 
@@ -130,18 +132,19 @@ public class CameraPlugin implements MethodCallHandler {
             cameras.add(details);
           }
           result.success(cameras);
-        } catch (CameraAccessException e) {
-          result.error("cameraAccess", e.getMessage(), null);
+        } catch (Exception e) {
+          handleException(e, result);
         }
         break;
       case "initialize":
         {
           String cameraName = call.argument("cameraName");
           String resolutionPreset = call.argument("resolutionPreset");
+          boolean enableAudio = call.argument("enableAudio");
           if (camera != null) {
             camera.close();
           }
-          camera = new Camera(cameraName, resolutionPreset, result);
+          camera = new Camera(cameraName, resolutionPreset, result, enableAudio);
           orientationEventListener.enable();
           break;
         }
@@ -172,8 +175,8 @@ public class CameraPlugin implements MethodCallHandler {
           try {
             camera.startPreviewWithImageStream();
             result.success(null);
-          } catch (CameraAccessException e) {
-            result.error("CameraAccess", e.getMessage(), null);
+          } catch (Exception e) {
+            handleException(e, result);
           }
           break;
         }
@@ -182,8 +185,8 @@ public class CameraPlugin implements MethodCallHandler {
           try {
             camera.startPreview();
             result.success(null);
-          } catch (CameraAccessException e) {
-            result.error("CameraAccess", e.getMessage(), null);
+          } catch (Exception e) {
+            handleException(e, result);
           }
           break;
         }
@@ -222,6 +225,18 @@ public class CameraPlugin implements MethodCallHandler {
         result.notImplemented();
         break;
     }
+  }
+
+  // We move catching CameraAccessException out of onMethodCall because it causes a crash
+  // on plugin registration for sdks incompatible with Camera2 (< 21). We want this plugin to
+  // to be able to compile with <21 sdks for apps that want the camera and support earlier version.
+  @SuppressWarnings("ConstantConditions")
+  private void handleException(Exception exception, Result result) {
+    if (exception instanceof CameraAccessException) {
+      result.error("CameraAccess", exception.getMessage(), null);
+    }
+
+    throw (RuntimeException) exception;
   }
 
   private static class CompareSizesByArea implements Comparator<Size> {
@@ -264,9 +279,14 @@ public class CameraPlugin implements MethodCallHandler {
     public Rect zoom;
     protected CameraCharacteristics cameraCharacteristics;
 
-    Camera(final String cameraName, final String resolutionPreset, final Result result) {
+    Camera(
+        final String cameraName,
+        final String resolutionPreset,
+        @NonNull final Result result,
+        final boolean enableAudio) {
 
       this.cameraName = cameraName;
+      this.enableAudio = enableAudio;
       textureEntry = view.createSurfaceTexture();
 
       registerEventChannel();
@@ -313,7 +333,7 @@ public class CameraPlugin implements MethodCallHandler {
                       "cameraPermission", "MediaRecorderCamera permission not granted", null);
                   return;
                 }
-                if (!hasAudioPermission()) {
+                if (enableAudio && !hasAudioPermission()) {
                   result.error(
                       "cameraPermission", "MediaRecorderAudio permission not granted", null);
                   return;
@@ -321,7 +341,7 @@ public class CameraPlugin implements MethodCallHandler {
                 open(result);
               }
             };
-        if (hasCameraPermission() && hasAudioPermission()) {
+        if (hasCameraPermission() && (!enableAudio || hasAudioPermission())) {
           cameraPermissionContinuation.run();
         } else {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -331,7 +351,9 @@ public class CameraPlugin implements MethodCallHandler {
             }
 
             activity.requestPermissions(
-                new String[] {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO},
+                enableAudio
+                    ? new String[] {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}
+                    : new String[] {Manifest.permission.CAMERA},
                 CAMERA_REQUEST_ID);
           }
         }
@@ -450,13 +472,14 @@ public class CameraPlugin implements MethodCallHandler {
         mediaRecorder.release();
       }
       mediaRecorder = new MediaRecorder();
-      mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+
+      if (enableAudio) mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
       mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
       mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-      mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+      if (enableAudio) mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
       mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
       mediaRecorder.setVideoEncodingBitRate(1024 * 1000);
-      mediaRecorder.setAudioSamplingRate(16000);
+      if (enableAudio) mediaRecorder.setAudioSamplingRate(16000);
       mediaRecorder.setVideoFrameRate(27);
       mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
       mediaRecorder.setOutputFile(outputFilePath);
