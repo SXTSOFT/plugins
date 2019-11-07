@@ -7,7 +7,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
-import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
@@ -21,7 +20,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
 import androidx.biometric.BiometricPrompt;
-import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import androidx.fragment.app.FragmentActivity;
 import io.flutter.plugin.common.MethodCall;
 import java.util.concurrent.Executor;
@@ -60,21 +58,18 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
 
   private final FragmentActivity activity;
   private final AuthCompletionHandler completionHandler;
-  private final KeyguardManager keyguardManager;
-  private final FingerprintManagerCompat fingerprintManager;
   private final MethodCall call;
   private final BiometricPrompt.PromptInfo promptInfo;
   private final boolean isAuthSticky;
   private final UiThreadExecutor uiThreadExecutor;
   private boolean activityPaused = false;
+  private BiometricPrompt biometricPrompt;
 
   public AuthenticationHelper(
       FragmentActivity activity, MethodCall call, AuthCompletionHandler completionHandler) {
     this.activity = activity;
     this.completionHandler = completionHandler;
     this.call = call;
-    this.keyguardManager = (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE);
-    this.fingerprintManager = FingerprintManagerCompat.from(activity);
     this.isAuthSticky = call.argument("stickyAuth");
     this.uiThreadExecutor = new UiThreadExecutor();
     this.promptInfo =
@@ -83,33 +78,23 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
             .setTitle((String) call.argument("signInTitle"))
             .setSubtitle((String) call.argument("fingerprintHint"))
             .setNegativeButtonText((String) call.argument("cancelButton"))
+            .setConfirmationRequired((Boolean) call.argument("sensitiveTransaction"))
             .build();
   }
 
+  /** Start the fingerprint listener. */
   public void authenticate() {
-    if (fingerprintManager.isHardwareDetected()) {
-      if (keyguardManager.isKeyguardSecure() && fingerprintManager.hasEnrolledFingerprints()) {
-        start();
-      } else {
-        if (call.argument("useErrorDialogs")) {
-          showGoToSettingsDialog();
-        } else if (!keyguardManager.isKeyguardSecure()) {
-          completionHandler.onError(
-              "PasscodeNotSet",
-              "Phone not secured by PIN, pattern or password, or SIM is currently locked.");
-        } else {
-          completionHandler.onError("NotEnrolled", "No fingerprint enrolled on this device.");
-        }
-      }
-    } else {
-      completionHandler.onError("NotAvailable", "Fingerprint is not available on this device.");
-    }
+    activity.getApplication().registerActivityLifecycleCallbacks(this);
+    biometricPrompt = new BiometricPrompt(activity, uiThreadExecutor, this);
+    biometricPrompt.authenticate(promptInfo);
   }
 
-  /** Start the fingerprint listener. */
-  private void start() {
-    activity.getApplication().registerActivityLifecycleCallbacks(this);
-    new BiometricPrompt(activity, uiThreadExecutor, this).authenticate(promptInfo);
+  /** Cancels the fingerprint authentication. */
+  public void stopAuthentication() {
+    if (biometricPrompt != null) {
+      biometricPrompt.cancelAuthentication();
+      biometricPrompt = null;
+    }
   }
 
   /** Stops the fingerprint listener. */
@@ -121,6 +106,23 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
   @Override
   public void onAuthenticationError(int errorCode, CharSequence errString) {
     switch (errorCode) {
+      case BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL:
+        completionHandler.onError(
+            "PasscodeNotSet",
+            "Phone not secured by PIN, pattern or password, or SIM is currently locked.");
+        break;
+      case BiometricPrompt.ERROR_NO_SPACE:
+      case BiometricPrompt.ERROR_NO_BIOMETRICS:
+        if (call.argument("useErrorDialogs")) {
+          showGoToSettingsDialog();
+          return;
+        }
+        completionHandler.onError("NotEnrolled", "No Biometrics enrolled on this device.");
+        break;
+      case BiometricPrompt.ERROR_HW_UNAVAILABLE:
+      case BiometricPrompt.ERROR_HW_NOT_PRESENT:
+        completionHandler.onError("NotAvailable", "Biometrics is not available on this device.");
+        break;
       case BiometricPrompt.ERROR_LOCKOUT:
         completionHandler.onError(
             "LockedOut",

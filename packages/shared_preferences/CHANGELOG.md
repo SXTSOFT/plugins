@@ -1,3 +1,35 @@
+## 0.5.4+3
+
+* Android: Suppress casting warnings.
+
+## 0.5.4+2
+
+* Remove AndroidX warnings.
+
+## 0.5.4+1
+
+* Include lifecycle dependency as a compileOnly one on Android to resolve
+  potential version conflicts with other transitive libraries.
+
+## 0.5.4
+
+* Support the v2 Android embedding.
+* Update to AndroidX.
+* Migrate to using the new e2e test binding.
+
+## 0.5.3+5
+
+* Define clang module for iOS.
+
+## 0.5.3+4
+
+* Copy `List` instances when reading and writing values to prevent mutations from propagating.
+
+## 0.5.3+3
+
+* `setMockInitialValues` can now be called multiple times and will
+  `reload()` the singleton if necessary.
+
 ## 0.5.3+2
 
 * Fix Gradle version.

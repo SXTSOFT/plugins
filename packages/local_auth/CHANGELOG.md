@@ -1,4 +1,36 @@
+## 0.6.1
+
+* Added ability to stop authentication (For Android).
+
+## 0.6.0+3
+
+* Remove AndroidX warnings.
+
+## 0.6.0+2
+
+* Update and migrate iOS example project.
+* Define clang module for iOS.
+
+## 0.6.0+1
+
+* Update the `intl` constraint to ">=0.15.1 <0.17.0" (0.16.0 isn't really a breaking change).
+
+## 0.6.0
+
+* Define a new parameter for signaling that the transaction is sensitive.
+* Up the biometric version to beta01.
+* Handle no device credential error.
+
+## 0.5.3
+
+* Add face id detection as well by not relying on FingerprintCompat.
+
+## 0.5.2+4
+
+* Update README to fix syntax error.
+
 ## 0.5.2+3
+
 * Update documentation to clarify the need for FragmentActivity.
 
 ## 0.5.2+2

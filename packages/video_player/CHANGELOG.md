@@ -1,3 +1,48 @@
+## 0.10.2+6
+
+* Remove AndroidX warnings.
+
+## 0.10.2+5
+
+* Update unit test for compatibility with Flutter stable branch.
+
+## 0.10.2+4
+
+* Define clang module for iOS.
+
+## 0.10.2+3
+
+* Fix bug where formatHint was not being pass down to network sources.
+
+## 0.10.2+2
+
+* Update and migrate iOS example project.
+
+## 0.10.2+1
+
+* Use DefaultHttpDataSourceFactory only when network schemas and use
+DefaultHttpDataSourceFactory by default.
+
+## 0.10.2
+
+* **Android Only** Adds optional VideoFormat used to signal what format the plugin should try.
+
+## 0.10.1+7
+
+* Fix tests by ignoring deprecated member use.
+
+## 0.10.1+6
+
+* [iOS] Fixed a memory leak with notification observing.
+
+## 0.10.1+5
+
+* Fix race condition while disposing the VideoController.
+
+## 0.10.1+4
+
+* Fixed syntax error in README.md.
+
 ## 0.10.1+3
 
 * Add missing template type parameter to `invokeMethod` calls.
