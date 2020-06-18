@@ -8,17 +8,34 @@ share dialog.
 Wraps the ACTION_SEND Intent on Android and UIActivityViewController
 on iOS.
 
+**Please set your constraint to `share: '>=0.6.y+x <2.0.0'`**
+
+## Backward compatible 1.0.0 version is coming
+The plugin has reached a stable API, we guarantee that version `1.0.0` will be backward compatible with `0.6.y+z`.
+Please use `share: '>=0.6.y+x <2.0.0'` as your dependency constraint to allow a smoother ecosystem migration.
+For more details see: https://github.com/flutter/flutter/wiki/Package-migration-to-1.0.0
+
 ## Usage
+
 To use this plugin, add `share` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).
 
 ## Example
 
-Import the library via
+Import the library.
+
 ``` dart
 import 'package:share/share.dart';
 ```
 
-Then invoke the static `share` method anywhere in your Dart code
+Then invoke the static `share` method anywhere in your Dart code.
+
 ``` dart
 Share.share('check out my website https://example.com');
+```
+
+The `share` method also takes an optional `subject` that will be used when
+sharing to email.
+
+``` dart
+Share.share('check out my website https://example.com', subject: 'Look what I made!');
 ```

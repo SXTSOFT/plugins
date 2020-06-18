@@ -48,6 +48,7 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
     platformThreadHandler = new Handler(context.getMainLooper());
     // Allow local storage.
     webView.getSettings().setDomStorageEnabled(true);
+    webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
 
     methodChannel = new MethodChannel(messenger, "plugins.flutter.io/webview_" + id);
     methodChannel.setMethodCallHandler(this);
@@ -157,6 +158,18 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
       case "getTitle":
         getTitle(result);
         break;
+      case "scrollTo":
+        scrollTo(methodCall, result);
+        break;
+      case "scrollBy":
+        scrollBy(methodCall, result);
+        break;
+      case "getScrollX":
+        getScrollX(result);
+        break;
+      case "getScrollY":
+        getScrollY(result);
+        break;
       default:
         result.notImplemented();
     }
@@ -253,6 +266,33 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
     result.success(webView.getTitle());
   }
 
+  private void scrollTo(MethodCall methodCall, Result result) {
+    Map<String, Object> request = (Map<String, Object>) methodCall.arguments;
+    int x = (int) request.get("x");
+    int y = (int) request.get("y");
+
+    webView.scrollTo(x, y);
+
+    result.success(null);
+  }
+
+  private void scrollBy(MethodCall methodCall, Result result) {
+    Map<String, Object> request = (Map<String, Object>) methodCall.arguments;
+    int x = (int) request.get("x");
+    int y = (int) request.get("y");
+
+    webView.scrollBy(x, y);
+    result.success(null);
+  }
+
+  private void getScrollX(Result result) {
+    result.success(webView.getScrollX());
+  }
+
+  private void getScrollY(Result result) {
+    result.success(webView.getScrollY());
+  }
+
   private void applySettings(Map<String, Object> settings) {
     for (String key : settings.keySet()) {
       switch (key) {
@@ -271,6 +311,8 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
           final boolean debuggingEnabled = (boolean) settings.get(key);
 
           webView.setWebContentsDebuggingEnabled(debuggingEnabled);
+          break;
+        case "gestureNavigationEnabled":
           break;
         case "userAgent":
           updateUserAgent((String) settings.get(key));
